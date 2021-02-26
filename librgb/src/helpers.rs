@@ -17,7 +17,8 @@ use std::ffi::{CStr, CString};
 use std::hash::{Hash, Hasher};
 use std::os::raw::{c_char, c_void};
 
-use rgb::i9n::Runtime;
+use rgb_node::i9n::Runtime;
+//use rgb20::Asset;
 
 use crate::error::RequestError;
 
@@ -47,7 +48,7 @@ pub(crate) trait CReturnType: Sized + 'static {
 
         if other.ty != ty {
             return Err(RequestError::Runtime(
-                rgb::error::BootstrapError::ArgParseError(s!("Type mismatch")),
+                rgb_node::error::BootstrapError::ArgParseError(s!("Type mismatch")),
             ));
         }
 

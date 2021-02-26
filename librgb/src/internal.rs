@@ -13,33 +13,42 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeSet, BTreeMap};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_double, c_uchar};
 use std::str::FromStr;
+use std::iter::FromIterator;
 
 #[cfg(not(target_os = "android"))]
 use log::LevelFilter;
 #[cfg(not(target_os = "android"))]
 use std::env;
 
-use rgb::lnpbp::bitcoin::OutPoint;
-use rgb::lnpbp::bp;
-use rgb::lnpbp::bp::blind::OutpointReveal;
-use rgb::lnpbp::client_side_validation::Conceal;
-use rgb::lnpbp::rgb::{Consignment, ContractId, FromBech32, Genesis};
+use bitcoin::OutPoint;
+use bitcoin::util::psbt::PartiallySignedTransaction;
+use bitcoin::blockdata::transaction::ParseOutPointError;
+use bitcoin::consensus::{Decodable, Encodable};
 
-use rgb::api::reply::SyncFormat;
-use rgb::fungible::{Asset, Invoice, Outpoint, OutpointCoins, SealCoins};
-use rgb::i9n::{Config, Runtime};
-use rgb::lnpbp::bitcoin::blockdata::transaction::ParseOutPointError;
-use rgb::lnpbp::strict_encoding::strict_decode;
-use rgb::rgbd::ContractName;
-use rgb::util::file::ReadWrite;
-use rgb::DataFormat;
+use lnpbp::Chain;
+use lnpbp::seals::{OutpointReveal, OutpointHash};
+use rgb::{
+    Consignment, ContractId, FromBech32, Genesis, //SealDefinition,
+    SealEndpoint, AtomicValue,
+};
+
+use rgb_node::rpc::reply::SyncFormat;
+use rgb20::{Asset, Invoice, Outpoint, OutpointCoins, SealCoins};
+use rgb_node::i9n::{Config, Runtime};
+use lnpbp::strict_encoding::strict_deserialize;
+use lnpbp::bech32::ToBech32String;
+use rgb_node::rgbd::ContractName;
+use rgb_node::util::file::ReadWrite;
+use microservices::FileFormat;
+use internet2::ZmqSocketAddr;
 
 use crate::error::RequestError;
 use crate::helpers::*;
+use lnpbp::client_side_validation::CommitConceal;
 
 pub(crate) fn _connect_rgb(
     datadir: *const c_char,
@@ -50,16 +59,21 @@ pub(crate) fn _connect_rgb(
     verbosity: u8,
 ) -> Result<Runtime, RequestError> {
     let c_network = unsafe { CStr::from_ptr(network) };
-    let network = bp::Chain::from_str(c_network.to_str()?)?;
+    let network = Chain::from_str(c_network.to_str()?)?;
 
     let c_stash_rpc_endpoint = unsafe { CStr::from_ptr(stash_rpc_endpoint) };
-    let stash_rpc_endpoint = c_stash_rpc_endpoint.to_str()?.to_string();
+    let stash_rpc_endpoint = ZmqSocketAddr::from_str(c_stash_rpc_endpoint.to_str()?)?;
 
     let c_electrum = unsafe { CStr::from_ptr(electrum) };
     let electrum = c_electrum.to_str()?.to_string();
 
-    let contract_endpoints: HashMap<ContractName, String> =
+    let s_contract_endpoints: HashMap<ContractName, String> =
         serde_json::from_str(&ptr_to_string(contract_endpoints)?)?;
+
+    let mut contract_endpoints= map!{};
+    for (name, url) in s_contract_endpoints {
+        contract_endpoints.insert(name, ZmqSocketAddr::from_str(url.as_str())?);
+    }
 
     let c_datadir = unsafe { CStr::from_ptr(datadir) };
     let datadir = c_datadir.to_str()?.to_string();
@@ -68,10 +82,7 @@ pub(crate) fn _connect_rgb(
         network,
         stash_rpc_endpoint,
         data_dir: datadir,
-        contract_endpoints: contract_endpoints
-            .into_iter()
-            .map(|(k, v)| -> Result<_, RequestError> { Ok((k, v)) })
-            .collect::<Result<_, _>>()?,
+        contract_endpoints,
         electrum_server: electrum,
         run_embedded: false,
         verbose: verbosity,
@@ -92,7 +103,7 @@ pub(crate) fn _run_rgb_embedded(
     verbosity: u8,
 ) -> Result<Runtime, RequestError> {
     let c_network = unsafe { CStr::from_ptr(network) };
-    let network = bp::Chain::from_str(c_network.to_str()?)?;
+    let network = Chain::from_str(c_network.to_str()?)?;
 
     let c_datadir = unsafe { CStr::from_ptr(datadir) };
     let datadir = c_datadir.to_str()?.to_string();
@@ -100,25 +111,18 @@ pub(crate) fn _run_rgb_embedded(
     let c_electrum = unsafe { CStr::from_ptr(electrum) };
     let electrum = c_electrum.to_str()?.to_string();
 
-    let contract_endpoints: HashMap<ContractName, String> =
-        [(ContractName::Fungible, s!("inproc://fungible-rpc"))]
+    let contract_endpoints: HashMap<ContractName, ZmqSocketAddr> =
+        [(ContractName::Fungible, ZmqSocketAddr::from_str("inproc://fungible-rpc")?)]
             .iter()
             .cloned()
             .collect();
-    let stash_rpc_endpoint = s!("inproc://stash-rpc");
-    let stash_pub_endpoint = s!("inproc://stash-pub");
-    let fungible_pub_endpoint = s!("inproc://fungible-pub");
+    let stash_rpc_endpoint = ZmqSocketAddr::from_str("inproc://stash-rpc")?;
 
     let config = Config {
         network,
         data_dir: datadir,
         stash_rpc_endpoint,
-        stash_pub_endpoint,
-        fungible_pub_endpoint,
-        contract_endpoints: contract_endpoints
-            .into_iter()
-            .map(|(k, v)| -> Result<_, RequestError> { Ok((k, v.parse()?)) })
-            .collect::<Result<_, _>>()?,
+        contract_endpoints,
         electrum_server: electrum,
         run_embedded: true,
         verbose: verbosity,
@@ -156,10 +160,10 @@ pub(crate) fn _issue(
     inflation: *const c_char,
     renomination: *const c_char,
     epoch: *const c_char,
-) -> Result<(), RequestError> {
+) -> Result<String, RequestError> {
     let runtime = Runtime::from_opaque(runtime)?;
 
-    let network = bp::Chain::from_str(&ptr_to_string(network)?)?;
+    let network = Chain::from_str(&ptr_to_string(network)?)?;
 
     let ticker = ptr_to_string(ticker)?;
 
@@ -202,7 +206,7 @@ pub(crate) fn _issue(
         epoch
     );
 
-    runtime.issue(
+    let asset = runtime.issue(
         network,
         ticker,
         name,
@@ -214,7 +218,7 @@ pub(crate) fn _issue(
         epoch,
     )?;
 
-    Ok(())
+    Ok(serde_json::to_string(&asset)?)
 }
 
 pub(crate) fn _list_assets(
@@ -222,8 +226,8 @@ pub(crate) fn _list_assets(
 ) -> Result<String, RequestError> {
     let runtime = Runtime::from_opaque(runtime)?;
 
-    let SyncFormat(_, data) = runtime.list_assets(DataFormat::StrictEncode)?;
-    let assets: Vec<Asset> = strict_decode(&data)?;
+    let SyncFormat(_, data) = runtime.list_assets(FileFormat::StrictEncode)?;
+    let assets: Vec<Asset> = strict_deserialize(&data)?;
 
     let json_response = serde_json::to_string(&assets)?;
     Ok(json_response)
@@ -303,7 +307,7 @@ pub(crate) fn _invoice(
     let outpoint_reveal = OutpointReveal::from(outpoint);
     let invoice = Invoice {
         contract_id,
-        outpoint: Outpoint::BlindedUtxo(outpoint_reveal.conceal()),
+        outpoint: Outpoint::BlindedUtxo(outpoint_reveal.commit_conceal()),
         amount,
     };
 
@@ -321,55 +325,70 @@ pub(crate) fn _invoice(
 
 pub(crate) fn _transfer(
     runtime: &COpaqueStruct,
+    contract_id: *const c_char,
     inputs: *const c_char,
-    allocate: *const c_char,
-    invoice: *const c_char,
-    prototype_psbt: *const c_char,
-    consignment_file: *const c_char,
-    transaction_file: *const c_char,
-) -> Result<(), RequestError> {
+    payment: *const c_char,
+    change: *const c_char,
+    witness: *const c_char,
+) -> Result<String, RequestError> {
     let runtime = Runtime::from_opaque(runtime)?;
 
-    let inputs: Vec<OutPoint> = serde_json::from_str(&ptr_to_string(inputs)?)?;
+    let contract_id = ContractId::from_str(&ptr_to_string(contract_id)?)?;
 
-    let a: Vec<String> = serde_json::from_str(&ptr_to_string(allocate)?)?;
-    let mut allocate: Vec<SealCoins> = Vec::with_capacity(a.len());
-    for entry in a {
-        allocate.push(
-            SealCoins::from_str(&entry).map_err(|_| {
-                RequestError::Outpoint(ParseOutPointError::Format)
-            })?,
-        );
+    let v_inputs: Vec<OutPoint> = serde_json::from_str(&ptr_to_string(inputs)?)?;
+    let inputs: BTreeSet<OutPoint> = BTreeSet::from_iter(v_inputs.into_iter());
+
+    let v_payments: Vec<String> = serde_json::from_str(&ptr_to_string(payment)?)?;
+    let mut payment: BTreeMap<SealEndpoint, AtomicValue> = bmap!{};
+    for payment_item in v_payments {
+        let parts: Vec<&str> = payment_item.split('@').collect();
+
+        if parts.len() == 2 {
+            let hash = OutpointHash::from_str(parts[0])?;
+            payment.insert(hash.into(), parts[1].parse()?);
+        }
+        else {
+            return Err(RequestError::Input(s!("Invalid payment format; expected '<value>@<hash>'")));
+        }
     }
 
-    let c_invoice = unsafe { CStr::from_ptr(invoice) };
-    let invoice = Invoice::from_str(c_invoice.to_str()?)?;
+    let v_changes: Vec<String> = serde_json::from_str(&ptr_to_string(change)?)?;
+    let mut change = bmap!{};
+    for change_item in v_changes {
+        let seal_coins = SealCoins::from_str(&change_item)
+            .map_err(|_| {
+                RequestError::Outpoint(ParseOutPointError::Format)
+            })?;
 
-    let c_prototype_psbt = unsafe { CStr::from_ptr(prototype_psbt) };
-    let prototype_psbt = c_prototype_psbt.to_str()?.to_string();
+        change.insert(seal_coins.seal_definition(), seal_coins.coins);
+    }
 
-    let c_consignment_file = unsafe { CStr::from_ptr(consignment_file) };
-    let consignment_file = c_consignment_file.to_str()?.to_string();
-
-    let c_transaction_file = unsafe { CStr::from_ptr(transaction_file) };
-    let transaction_file = c_transaction_file.to_str()?.to_string();
+    let c_witness = unsafe { CStr::from_ptr(witness) };
+    let mut data = c_witness.to_bytes();
+    let witness = PartiallySignedTransaction::consensus_decode(&mut data)?;
 
     debug!(
-        "TransferArgs {{ inputs: {:?}, allocate: {:?}, invoice: {}, prototype_psbt: {:?}, \
-        consignment_file: {:?}, transaction_file: {:?} }}",
-        inputs, allocate, invoice, prototype_psbt, consignment_file, transaction_file
+        "TransferArgs {{contract_id: {}, inputs: {:?}, payment: {:?}, change: {:?}, witness: {:?}}}",
+        contract_id, inputs, payment, change, witness,
     );
 
-    runtime.transfer(
+    let transfer = runtime.transfer(
+        contract_id,
         inputs,
-        allocate,
-        invoice,
-        prototype_psbt,
-        consignment_file,
-        transaction_file,
+        payment,
+        change,
+        witness,
     )?;
 
-    Ok(())
+    let mut data = vec![];
+    transfer.witness.consensus_encode(&mut data)?;
+
+    let json_transfer = json!({
+        "consignment": transfer.consignment.to_bech32_string(),
+        "witness": String::from_utf8(data)
+            .map_err(|e| e.utf8_error())?
+    });
+    Ok(json_transfer.to_string())
 }
 
 pub(crate) fn _validate(

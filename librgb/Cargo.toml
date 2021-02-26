@@ -18,14 +18,20 @@ cbindgen = "^0.14"
 openssl = { version = "^0.10", features = ["vendored"] }
 
 [dependencies]
-amplify = "2.4"
+amplify = "3"
 amplify_derive = "2.4"
 log = "0.4"
-rgb_node = { version = "~0.2.2", features = [ "server", "client", "cli", "node", "fungibles" ] }
+rgb_node = { path = "../../rgb-node", features = [ "server", "client", "cli", "node", "fungibles" ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_with = "~1.5.0"
 serde_with_macros = "~1.2.0" # Fix for the problem in 1.3.0
 serde_json = "~1.0.55"
+bitcoin = { version = "~0.26.0", features = ["rand"] }
+lnpbp = { git = "https://github.com/LNP-BP/rust-lnpbp" }
+rgb-core = { git = "https://github.com/rgb-org/rgb-core" }
+rgb20 = { git = "https://github.com/rgb-org/rgb-core" }
+microservices = { git = "https://github.com/internet2-org/rust-internet2", default-features = false }
+internet2 = { git = "https://github.com/internet2-org/rust-internet2" }
 
 [patch.crates-io]
 # Required to fix Android SystemTime incorrect size

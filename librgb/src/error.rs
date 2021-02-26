@@ -17,7 +17,7 @@
 pub(crate) enum RequestError {
     /// Bech32 error: {_0}
     #[from]
-    Bech32(rgb::lnpbp::rgb::bech32::Error),
+    Bech32(rgb::bech32::Error),
 
     /// Input value is not a JSON object or JSON parse error: {_0}
     #[from]
@@ -25,7 +25,7 @@ pub(crate) enum RequestError {
 
     /// Invoice error: {_0}
     #[from]
-    Invoice(rgb::fungible::InvoiceError),
+    Invoice(rgb20::InvoiceError),
 
     /// Input value is not a UTF8 string: {_0}
     #[from]
@@ -33,19 +33,19 @@ pub(crate) enum RequestError {
 
     /// Invalid network/chain identifier: {_0}
     #[from]
-    ChainParse(rgb::lnpbp::bp::chain::ParseError),
+    ChainParse(lnpbp::chain::ParseError),
 
     /// Bootstrap error: {_0}
     #[from]
-    Runtime(rgb::error::BootstrapError),
+    Runtime(rgb_node::error::BootstrapError),
 
     /// Transport error: {_0}
     #[from]
-    Transport(rgb::lnpbp::lnp::transport::Error),
+    Transport(internet2::transport::Error),
 
     /// Integration error: {_0}
     #[from]
-    Integration(rgb::i9n::Error),
+    Integration(rgb_node::i9n::Error),
 
     /// Impossible error: {_0}
     #[from]
@@ -53,7 +53,7 @@ pub(crate) enum RequestError {
 
     /// Outpoint parsing error: {_0}
     #[from]
-    Outpoint(rgb::lnpbp::bitcoin::blockdata::transaction::ParseOutPointError),
+    Outpoint(bitcoin::blockdata::transaction::ParseOutPointError),
 
     /// I/O error: {_0}
     #[from]
@@ -65,5 +65,21 @@ pub(crate) enum RequestError {
 
     /// Strict encoding error: {_0}
     #[from]
-    StrictEncoding(rgb::lnpbp::strict_encoding::Error),
+    StrictEncoding(lnpbp::strict_encoding::Error),
+
+    /// ZeroMQ socket address error: {_0}
+    #[from]
+    ZmqSocketAddr(internet2::AddrError),
+
+    /// Hex format error: {_0}
+    #[from]
+    Hex(bitcoin::hashes::hex::Error),
+
+    /// Parse integer error: {_0}
+    #[from]
+    ParseInt(std::num::ParseIntError),
+
+    /// Bitcoin consensus encode error: {_0}
+    #[from]
+    ConsensusEncode(bitcoin::consensus::encode::Error),
 }

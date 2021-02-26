@@ -66,7 +66,7 @@ pub extern "C" fn rgb_node_fungible_issue(
     inflation: *const c_char,
     renomination: *const c_char,
     epoch: *const c_char,
-) -> CResult {
+) -> CResultString {
     _issue(
         runtime,
         network,
@@ -133,21 +133,19 @@ pub extern "C" fn rgb20_invoice(
 #[no_mangle]
 pub extern "C" fn rgb_node_fungible_transfer(
     runtime: &COpaqueStruct,
+    contract_id: *const c_char,
     inputs: *const c_char,
-    allocate: *const c_char,
-    invoice: *const c_char,
-    prototype_psbt: *const c_char,
-    consignment_file: *const c_char,
-    transaction_file: *const c_char,
-) -> CResult {
+    payment: *const c_char,
+    change: *const c_char,
+    witness: *const c_char,
+) -> CResultString {
     _transfer(
         runtime,
+        contract_id,
         inputs,
-        allocate,
-        invoice,
-        prototype_psbt,
-        consignment_file,
-        transaction_file,
+        payment,
+        change,
+        witness,
     )
     .into()
 }
