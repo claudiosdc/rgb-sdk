@@ -1,6 +1,6 @@
 %module rgb
 %{
-#include "../../librgb/librgb.h"
+#include "./include/librgb.h"
 %}
 
 %typemap(out) CResult %{
@@ -38,4 +38,4 @@
     }
 %}
 
-%include "../../librgb/librgb.h"
+%include "./include/librgb.h"

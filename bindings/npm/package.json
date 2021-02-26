@@ -12,7 +12,10 @@
   "main": "rgblib.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "preinstall": "cargo build --release --manifest-path ../../librgb/Cargo.toml && swig -javascript -node -c++ swig.i",
+    "build_mac_lib": "./bin/build_mac_lib.sh",
+    "build_linux_lib": "./bin/build_linux_lib.sh",
+    "build_all_lib": "npm run build_mac_lib && npm run build_linux_lib",
+    "preinstall": "swig -javascript -node -c++ swig.i",
     "install": "node ./node_modules/node-gyp/bin/node-gyp.js rebuild"
   },
   "author": "LNP/BP Standards Association",

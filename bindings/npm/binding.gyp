@@ -4,16 +4,33 @@
       "target_name": "rgblib",
       "sources": [ "swig_wrap.cxx" ],
       "libraries": [
-           '-L<(module_root_dir)/../../librgb/target/release',
-           '-lrgb',
-       ],
+         '-lrgb',
+      ],
       "include_dirs": [
-           '../../librgb',
+         '<(module_root_dir)/include',
        ],
-      "ldflags": [
-           '-Wl,-rpath,../../librgb/target/release/'
-       ],
+      "ldflags": [],
       "cflags!": ["-std=c++11"],
+      'conditions': [
+        [
+          'OS == "mac"', {
+            'libraries': [
+              '-L<(module_root_dir)/lib/mac',
+            ],
+            "ldflags": [
+              '-Wl,-rpath,<(module_root_dir)/lib/mac/'
+            ]
+          },
+          'OS == "linux"', {
+            'libraries': [
+              '-L<(module_root_dir)/lib/linux',
+            ],
+            "ldflags": [
+              '-Wl,-rpath,<(module_root_dir)/lib/linux/'
+            ]
+          }
+        ],
+      ]
     }
   ]
 }
