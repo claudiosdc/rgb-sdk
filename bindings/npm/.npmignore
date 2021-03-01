@@ -1,0 +1,3 @@
+/build/
+node_modules/
+/swig_wrap.cxx
