@@ -16,7 +16,7 @@
     "build_linux_lib": "./bin/build_linux_lib.sh",
     "build_all_lib": "npm run build_mac_lib && npm run build_linux_lib",
     "preinstall": "swig -javascript -node -c++ swig.i",
-    "install": "node ./node_modules/node-gyp/bin/node-gyp.js rebuild"
+    "install": "node-gyp rebuild"
   },
   "author": "LNP/BP Standards Association",
   "license": "MIT",
