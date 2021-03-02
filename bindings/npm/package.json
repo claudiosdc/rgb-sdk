@@ -1,6 +1,6 @@
 {
   "name": "@claudiosdc/rgblib",
-  "version": "0.2.0-beta.1",
+  "version": "0.2.0-beta.2",
   "description": "RGB (Bitcoin & Lightning Network smart contracts layer) c-library bindings (librgb)",
   "homepage": "https://github.com/LNP-BP/rgb-sdk/tree/master/bindings/npm",
   "keywords": [
@@ -24,7 +24,7 @@
     "node-gyp": "^7.1.0"
   },
   "publishConfig": {
-    "registry":"https://npm.pkg.github.com/"
+    "registry": "https://npm.pkg.github.com/"
   },
   "repository": "git://github.com/claudiosdc/rgb-sdk.git"
 }

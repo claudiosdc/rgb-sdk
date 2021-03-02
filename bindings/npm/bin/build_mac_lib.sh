@@ -27,4 +27,4 @@ if [[ ! -d "$RUST_PROJECT_DIR" ]]; then
   exit -1
 fi
 
-cargo build --target x86_64-apple-darwin --release --manifest-path "$RUST_PROJECT_DIR/Cargo.toml" && rsync -t "$RUST_PROJECT_DIR/target/x86_64-apple-darwin/release"/lib* "$LIB_DIR"/mac/ && rsync -t "$RUST_PROJECT_DIR/librgb.h" "$INCLUDE_DIR"
+cargo build --target x86_64-apple-darwin --release --manifest-path "$RUST_PROJECT_DIR/Cargo.toml" && rsync -t "$RUST_PROJECT_DIR/target/x86_64-apple-darwin/release/librgb.dylib" "$LIB_DIR"/mac/ && rsync -t "$RUST_PROJECT_DIR/librgb.h" "$INCLUDE_DIR"
